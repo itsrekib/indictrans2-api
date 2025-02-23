@@ -1,14 +1,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import os
 
 app = FastAPI()
 
-# Load model manually from Hugging Face Hub
-MODEL_NAME = "ai4bharat/indictrans2-indic-en-1B"
-MODEL_PATH = "./indictrans2_model"
+# Load the summarizer model manually
+MODEL_NAME = "facebook/bart-large-cnn"
+MODEL_PATH = "./summarizer_model"
 
 # Download model files manually if not already present
 if not os.path.exists(MODEL_PATH):
@@ -19,19 +18,25 @@ if not os.path.exists(MODEL_PATH):
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
 model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_PATH)
 
-class TranslationRequest(BaseModel):
+class SummarizationRequest(BaseModel):
     text: str
-    source_lang: str
-    target_lang: str
+    max_length: int = 100
+    min_length: int = 30
 
-@app.post("/translate")
-def translate_text(request: TranslationRequest):
+@app.post("/summarize")
+def summarize_text(request: SummarizationRequest):
     inputs = tokenizer(request.text, return_tensors="pt", padding=True, truncation=True)
-    outputs = model.generate(**inputs)
-    translated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    summary_ids = model.generate(inputs["input_ids"], max_length=request.max_length, min_length=request.min_length, length_penalty=2.0)
+    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     
-    return {"translated_text": translated_text}
+    return {"summary": summary}
 
 @app.get("/")
 def home():
-    return {"message": "IndicTrans2 API is running!"}
+    return {"message": "Summarization API is running!"}
+
+# Use Render's assigned port
+if __name__ == "__main__":
+    import uvicorn
+    PORT = int(os.environ.get("PORT", 8000))  # Get Render's assigned port
+    uvicorn.run("app:app", host="0.0.0.0", port=PORT, reload=True)
