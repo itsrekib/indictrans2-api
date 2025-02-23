@@ -3,3 +3,4 @@ transformers
 sentencepiece
 fastapi
 uvicorn
+huggingface_hub
