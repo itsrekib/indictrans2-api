@@ -4,6 +4,7 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
 import os
 
+# Initialize FastAPI app
 app = FastAPI()
 
 # Define the request body schema using Pydantic
@@ -46,24 +47,34 @@ lang_code_map = {
     "urd_Arab": "<2urd_Arab>",  # Urdu
 }
 
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the IndicTrans2 Translation API!"}
+
+# Translation endpoint
 @app.post("/translate/")
 async def translate(request: TranslationRequest):
     try:
+        # Check if the target language is supported
         if request.target_lang not in lang_code_map:
             raise HTTPException(status_code=400, detail="Unsupported target language")
 
         # Prepend language token to input text
-        input_text = lang_code_map[request.target_lang] + request.text
+        input_text = lang_code_map[request.target_lang] + " " + request.text
         inputs = tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True)
 
+        # Generate translation
         with torch.no_grad():
             translated_tokens = model.generate(**inputs)
         
+        # Decode the translated tokens
         translated_text = tokenizer.decode(translated_tokens[0], skip_special_tokens=True)
         return {"translated_text": translated_text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Run the app
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))  # Use Render's PORT environment variable
